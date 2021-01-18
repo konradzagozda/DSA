@@ -1,95 +1,138 @@
 package kryptografia;
 
 import java.math.BigInteger;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+
+
+
 public class Bob {
-    private Random random;
+    Random random = new Random();
 
-    private BigInteger prime;
-    private BigInteger alfa;
-    private BigInteger bobsPrivateKey;
-    private BigInteger bobsPublicKey;
-    private BigInteger maskingKey;
-    private BigInteger invMaskingKey;
+    private BigInteger p,q,g,y;
+
+//    private BigInteger prime;
+//    private BigInteger alfa;
+//    private BigInteger bobsPublicKey;
+//    private BigInteger alicesPrivateKey;
+//    private BigInteger alicesPublicKey;
+//    private BigInteger maskingKey;
+
+    public Bob(BigInteger p, BigInteger q, BigInteger g, BigInteger y) {
+        this.p = p;
+        this.q = q;
+        this.g = g;
+        this.y = y;
 
 
-    public Bob() {
-        random = new Random();
-        prime = BigInteger.probablePrime(256, random);
-        alfa = BigInteger.probablePrime(255, random);
-
-        bobsPrivateKey = BigInteger.probablePrime(255, random);
-        bobsPublicKey = alfa.modPow(bobsPrivateKey, prime);
+//        this.prime = prime;
+//        this.alfa = alfa;
+//        this.bobsPublicKey = bobsPublicKey;
+//        this.alicesPrivateKey = BigInteger.probablePrime(255, this.random);
+//        this.alicesPublicKey = this.alfa.modPow(alicesPrivateKey, this.prime);
+//        this.maskingKey = bobsPublicKey.modPow(alicesPrivateKey, prime);
     }
 
-    public BigInteger getPrime() {
-        return prime;
-    }
-
-    public BigInteger getAlfa() {
-        return alfa;
-    }
-
-    public BigInteger getBobsPrivateKey() {
-        return bobsPrivateKey;
-    }
-
-    public BigInteger getBobsPublicKey() {
-        return bobsPublicKey;
-    }
-
-    public BigInteger computeMaskingKey(BigInteger alicesPublicKey) {
-        BigInteger maskingKey = alicesPublicKey.modPow(bobsPrivateKey, prime);
-        this.maskingKey = maskingKey;
-        this.invMaskingKey = maskingKey.modInverse(prime);
-        return maskingKey;
-    }
-
-    public byte[] decrypt(byte[] block) {
-        var bigIntBlock = new BigInteger(1,block);
-
-        var bigIntResult = bigIntBlock.multiply(invMaskingKey).mod(prime);
-        var result =  bigIntResult.toByteArray();
-
-        if (result.length > 16){
-            byte[] tmp = new byte[16];
-            System.arraycopy(result,result.length-16,tmp,0,16);
-            result = tmp;
+    public BigInteger HashBytes(byte[] message) {
+        MessageDigest digest = null;
+        try {
+            digest = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
         }
-
-        if (result.length < 16) {
-            byte[] tmp = new byte[16];
-            System.arraycopy(result,0, tmp,16-result.length, result.length);
-            result = tmp;
-        }
-
-        return result;
+        byte[] encodedhash = digest.digest(message);
+        return new BigInteger(encodedhash);
     }
 
-    public byte[] decode(List<byte[]> encodedBlocks) {
-        byte[] decodedMessage = new byte[encodedBlocks.size() * 16];
+    public boolean verifySignature(BigInteger r, BigInteger s, byte[] message) {
+        BigInteger w = s.modInverse(q);
 
-        for (int i = 0; i < encodedBlocks.size(); i++) {
-            byte[] decryptedBlock = decrypt(encodedBlocks.get(i));
-            System.arraycopy(decryptedBlock,0,decodedMessage,16*i,16);
-        }
-
-
-        // remove leading zeros
-        int i = 0;
-        int zeros = 0;
-        while(decodedMessage[i] == 0){
-            zeros++;
-            i++;
-        }
-
-        byte[] decodedMessageWithRemovedZeros = new byte[decodedMessage.length - zeros];
-        System.arraycopy(decodedMessage, zeros, decodedMessageWithRemovedZeros, 0, decodedMessage.length - zeros);
-
-        return decodedMessageWithRemovedZeros;
+        BigInteger hash = HashBytes(message);
+        BigInteger u1 = hash.multiply(w).mod(q);
+        BigInteger u2 = r.multiply(w).mod(q);
+        BigInteger v = (g.modPow(u1,p).multiply(y.modPow(u2,p))).mod(p).mod(q);
+//        System.out.println(v);
+//        System.out.println(r);
+        return v.equals(r);
     }
 
+
+
+//    // must be sure message is always less than prime!
+//    // how?
+//    // use block of 16 bytes for example...
+//    public byte[] encrypt(byte[] block) {
+//        var bigIntBlock = new BigInteger(1,block);
+//
+//        var bigIntResult = bigIntBlock.multiply(maskingKey).mod(prime);
+//        return bigIntResult.toByteArray();
+//    }
+//
+//    public List<byte[]> encode(byte[] message) {
+//        int wholeBlocks = message.length / 16;
+//        boolean isEven = message.length % 16 == 0;
+//        List<byte[]> encodedBlocks = new ArrayList<>();
+//
+//        int remainingBytes = message.length % 16;
+//
+//        if (!isEven) {
+//            // create first block with 0s appended
+//            // 5 za duzo znakow
+//            // 16 - 5 = 11 - tyle zer dodac na poczatek
+//            byte[] block1st = new byte[16];
+//            for (int i = 0; i < 16 - remainingBytes; i++) {
+//                block1st[i] = 0;
+//            }
+//            int j = 0;
+//            for (int i = 16 - remainingBytes; i < 16; i++) {
+//                block1st[i] = message[j];
+//                j++;
+//            }
+//
+//            encodedBlocks.add(encrypt(block1st));
+//        }
+//
+//        // 5..
+//        for (int i = remainingBytes; i < remainingBytes + wholeBlocks*16; i+= 16) {
+//            byte[] block = new byte[16];
+//            System.arraycopy(message,i,block,0,16);
+//            encodedBlocks.add(encrypt(block));
+//        }
+//
+//        return encodedBlocks;
+//    }
+//
+//    public Random getRandom() {
+//        return random;
+//    }
+//
+//    public BigInteger getPrime() {
+//        return prime;
+//    }
+//
+//    public BigInteger getAlfa() {
+//        return alfa;
+//    }
+//
+//    public BigInteger getBobsPublicKey() {
+//        return bobsPublicKey;
+//    }
+//
+//    public BigInteger getAlicesPrivateKey() {
+//        return alicesPrivateKey;
+//    }
+//
+//    public BigInteger getAlicesPublicKey() {
+//        return alicesPublicKey;
+//    }
+//
+//    public BigInteger getMaskingKey() {
+//        return maskingKey;
+//    }
 }

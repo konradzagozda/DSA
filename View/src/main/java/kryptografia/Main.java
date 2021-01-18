@@ -16,7 +16,7 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) throws Exception {
         Parent root = FXMLLoader.load(getClass().getResource("/mainView.fxml"));
-        primaryStage.setTitle("Elgamal encryption");
+        primaryStage.setTitle("DSA signing");
         primaryStage.setScene(new Scene(root, 800, 1000));
         primaryStage.show();
     }
